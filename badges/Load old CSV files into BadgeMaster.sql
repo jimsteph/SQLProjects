@@ -123,7 +123,7 @@ BEGIN
 	UPDATE Badges
 	SET DateDeactivated = NULL
 		,DateIssued = @FileDate
-		,DuplicateReason = ''
+		,DuplicateReason = 'Reactivated on ' + convert(varchar(30),@FileDate)
 	FROM Badges
 	INNER JOIN CSVStaging ON Badges.RFID = CSVStaging.RFID
 	WHERE DateDeactivated IS NOT NULL
