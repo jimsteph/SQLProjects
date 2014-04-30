@@ -83,6 +83,10 @@ BEGIN
 			);
 
 	/*  Here is where we'll process the csv files we just loaded */
+	-- start by marking all existing badges as inactive
+	UPDATE Badges
+	SET IsActive = 'FALSE'
+
 	-- copy all badges that are new into the database	
 	INSERT INTO Badges (
 		RFID
@@ -108,47 +112,32 @@ BEGIN
 			FROM Badges
 			);
 
-	-- mark any badges that aren't in CSVStaging as deactivated
+	-- reactivate badges in Badges that were active in CSV
 	UPDATE Badges
-	SET DateDeactivated = CASE 
-			WHEN DateDeactivated IS NULL
-				THEN @FileDate
-			ELSE DateDeactivated
-			END
-		,IsActive = 'FALSE'
-		,DuplicateReason = CASE 
-			WHEN DuplicateReason = ''
-				THEN 'No longer active: unknown reason'
-			ELSE DuplicateReason
-			END
-		,Duplicates = 'True'
-	WHERE (
-			RFID NOT IN (
-				SELECT RFID
-				FROM CSVStaging
-				)
-			);
-
-	UPDATE Badges
-	SET IsActive = 'False'
-		,DuplicateReason = 'Duplicate'
-		,DateDeactivated = CASE 
-			WHEN DateDeactivated IS NULL
-				THEN @FileDate
-			ELSE DateDeactivated
-			END
+	SET IsActive = 'TRUE'
 	FROM Badges
 	INNER JOIN CSVStaging ON Badges.RFID = CSVStaging.RFID
-	WHERE LEN(CSVStaging.StudentID) > 7
 
-	-- force active badges active
+	-- any active badges with a date in DateDeactivated must have just been reactivated, so
+	-- change DateDeactivated to null and DateAdded to @FileDate
 	UPDATE Badges
-	SET IsActive = 'True'
-		,DuplicateReason = ''
-		,DateDeactivated = NULL
+	SET DateDeactivated = NULL
+		,DateIssued = @FileDate
 	FROM Badges
 	INNER JOIN CSVStaging ON Badges.RFID = CSVStaging.RFID
-	WHERE LEN(CSVStaging.StudentID) = 7
+	WHERE DateDeactivated IS NOT NULL
+		AND IsActive = 'TRUE'
+
+	-- if a badge isn't in the current CSVStaging table, it is inactive.  If DateDeactivated
+	-- is null, it just went inactive so change it to @FileDate
+	UPDATE Badges
+	SET DateDeactivated = @FileDate
+		,DuplicateReason = 'Dropped on ' + convert(varchar(30),@FileDate)
+	WHERE DateDeactivated IS NULL
+		AND RFID NOT IN (
+			SELECT RFID
+			FROM CSVStaging
+			)
 
 	FETCH NEXT
 	FROM FileCursor
