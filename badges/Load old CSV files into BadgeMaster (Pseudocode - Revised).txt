@@ -1,0 +1,19 @@
+Create a file named BigList (Active, RFID, StudentID, DateAdded, DateDropped)
+
+
+For each CSV file in ascending (by date) order:
+    In BigList set Active to False for all records
+    For each line in CSVFile do:
+        Read RFID, StudentID
+        If RFID = "RFID" continue       # it's a header
+        If len(StudentID) = 7:          # dupes would be eight or more characters 
+                                        #   in length
+            If RFID not in BigList:
+                Add Active=True, RFID, StudentID, Date from File Name,
+                and DateDropped=null to BigList
+            If RFID in BigList:
+                Set Active=True
+                If DateDropped is not null    # It was inactive if this is true
+                    DateDropped = null
+                    DateAdded = FileDate
+                    
