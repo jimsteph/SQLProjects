@@ -75,11 +75,12 @@ BEGIN
 	PRINT '     Import: Done';
 
 	-- If the StudentID is more than seven characters, it's a duplicate card
+	-- Keep the bus driver cards for now ...
 	DELETE
 	FROM CSVStaging
 	WHERE NOT (
 			(LEN(StudentID) = 7)
-			AND (StudentID NOT LIKE '%Bus%')
+			OR (StudentID LIKE '%Bus%')
 			);
 
 	/*  Here is where we'll process the csv files we just loaded */
@@ -112,6 +113,17 @@ BEGIN
 			FROM Badges
 			);
 
+	-- if a badge isn't in the current CSVStaging table, it is inactive.  If 
+	-- DateDeactivated is null, it just went inactive so change it to @FileDate
+	UPDATE Badges
+	SET DateDeactivated = @FileDate
+		,DuplicateReason = 'Dropped on ' + convert(VARCHAR(30), @FileDate)
+	WHERE DateDeactivated IS NULL
+		AND RFID NOT IN (
+			SELECT RFID
+			FROM CSVStaging
+			)
+
 	-- reactivate badges in Badges that were active in CSV
 	UPDATE Badges
 	SET IsActive = 'TRUE'
@@ -123,22 +135,11 @@ BEGIN
 	UPDATE Badges
 	SET DateDeactivated = NULL
 		,DateIssued = @FileDate
-		,DuplicateReason = 'Reactivated on ' + convert(varchar(30),@FileDate)
+		,DuplicateReason = 'Reactivated on ' + CONVERT(varchar(50), @FileDate)
 	FROM Badges
 	INNER JOIN CSVStaging ON Badges.RFID = CSVStaging.RFID
 	WHERE DateDeactivated IS NOT NULL
 		AND IsActive = 'TRUE'
-
-	-- if a badge isn't in the current CSVStaging table, it is inactive.  If DateDeactivated
-	-- is null, it just went inactive so change it to @FileDate
-	UPDATE Badges
-	SET DateDeactivated = @FileDate
-		,DuplicateReason = 'Dropped on ' + convert(varchar(30),@FileDate)
-	WHERE DateDeactivated IS NULL
-		AND RFID NOT IN (
-			SELECT RFID
-			FROM CSVStaging
-			)
 
 	FETCH NEXT
 	FROM FileCursor
